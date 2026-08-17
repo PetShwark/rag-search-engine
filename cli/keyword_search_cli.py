@@ -12,7 +12,7 @@ def search_movies_from_json_file(json_file: str, search_for: str, max_results: i
     for movie in movie_data["movies"]:
         if result_count >= max_results:
             break
-        if movie.get("title") and search_for in movie["title"]:
+        if movie.get("title") and search_for.lower() in movie["title"].lower():
             result.append(movie["title"])
             result_count += 1
     return result
