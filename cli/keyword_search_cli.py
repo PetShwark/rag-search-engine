@@ -1,5 +1,6 @@
 import argparse
 import json
+import string
 
 def search_movies_from_json_file(json_file: str, search_for: str, max_results: int = 5) -> list[str]:
     result: list[str] = []
@@ -9,12 +10,16 @@ def search_movies_from_json_file(json_file: str, search_for: str, max_results: i
         except json.JSONDecodeError, UnicodeDecodeError:
             print(f"Error decoding JSON file.")
     result_count = 0
+    punctranslator = str.maketrans("", "", string.punctuation)
+    search_for = search_for.translate(punctranslator).lower()
     for movie in movie_data["movies"]:
         if result_count >= max_results:
             break
-        if movie.get("title") and search_for.lower() in movie["title"].lower():
-            result.append(movie["title"])
-            result_count += 1
+        if movie.get("title"):
+            movie_title_to_search = movie["title"].translate(punctranslator).lower()
+            if search_for in movie_title_to_search:
+                result.append(movie["title"])
+                result_count += 1
     return result
             
 
