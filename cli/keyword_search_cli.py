@@ -1,7 +1,7 @@
 import argparse
 import json
 import string
-
+from nltk.stem import PorterStemmer
 
 def token_found(search_for: list[str], search_in: list[str]) -> bool:
     """
@@ -9,9 +9,12 @@ def token_found(search_for: list[str], search_in: list[str]) -> bool:
     It is assumed that the strings have been tokenized (lowercase-d and punctuation
     removed).
     """
+    stemmer = PorterStemmer()
     for search_in_token in search_in:
         for search_for_token in search_for:
-            if search_for_token in search_in_token:
+            stemmed_for_token = stemmer.stem(search_for_token)
+            stemmed_in_token = stemmer.stem(search_in_token)
+            if stemmed_for_token in stemmed_in_token:
                 return True
     return False
 
