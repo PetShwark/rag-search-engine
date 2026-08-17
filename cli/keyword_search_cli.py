@@ -16,6 +16,31 @@ def token_found(search_for: list[str], search_in: list[str]) -> bool:
     return False
 
 
+def stop_words(filename: str) -> list[str]:
+    """
+    Gets the stop words from the named file and processes them into tokens.  It returns the list of tokens.
+    """
+    result: list[str] = []
+    with open(filename, "r") as file:
+        lines = file.read().splitlines()
+    for word in lines:
+        result.append(depunctuate(word).lower().strip())
+    return result
+
+
+def filtered_tokens(filter_out: list[str], from_list: list[str]) -> list[str]:
+    result: list[str] = []
+    for from_token in from_list:
+        remove_this = False
+        for token_to_remove in filter_out:
+            if token_to_remove == from_token:
+                remove_this = True
+                break
+        if not remove_this:
+            result.append(from_token)
+    return result
+
+
 def depunctuate(input: str) -> str:
     punctranslator = str.maketrans("", "", string.punctuation)
     return input.translate(punctranslator)
@@ -42,13 +67,14 @@ def search_movies_from_json_file(json_file: str, search_for: str, max_results: i
         except json.JSONDecodeError, UnicodeDecodeError:
             print(f"Error decoding JSON file.")
     result_count = 0
-    search_for_tokens = tokenize(search_for)
+    stop_word_tokens = stop_words("./data/stopwords.txt")
+    search_for_tokens = filtered_tokens(filter_out=stop_word_tokens, from_list=tokenize(search_for))
     if movie_data.get("movies"):
         for movie in movie_data["movies"]:
             if result_count >= max_results:
                 break
             if movie.get("title"):
-                movie_title_tokens = tokenize(movie["title"])
+                movie_title_tokens = filtered_tokens(filter_out=stop_word_tokens, from_list=tokenize(movie["title"]))
                 if token_found(search_for_tokens, movie_title_tokens):
                     result.append(movie["title"])
                     result_count += 1
