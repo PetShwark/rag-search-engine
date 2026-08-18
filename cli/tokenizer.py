@@ -17,6 +17,14 @@ def token_found(search_for: list[str], search_in: list[str]) -> bool:
     return False
 
 
+def stem_tokens(input_tokens: list[str]) -> list[str]:
+    stemmer = PorterStemmer()
+    unique_strings = set()
+    for input_token in input_tokens:
+        unique_strings.add(stemmer.stem(input_token))
+    return list(unique_strings)
+
+
 def stop_words(filename: str) -> list[str]:
     """
     Gets the stop words from the named file and processes them into tokens.  It returns the list of tokens.

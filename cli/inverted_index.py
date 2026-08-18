@@ -1,22 +1,25 @@
 from pydantic import BaseModel
-from typing import List, Dict, Set
-from pickle import dump
+from typing import List, Dict, Set, ClassVar
+from pickle import dump, load
 from pathlib import Path
-from tokenizer import tokenize
-from movies import load_movies
+from tokenizer import tokenize, stop_words, filtered_tokens, stem_tokens
+from movies import load_movies, Movie
 
 type Token = str
 type DocID = int
-type Document = str
 
 class InvertedIndex(BaseModel):
-    index: Dict[Token, Set[DocID]]
-    docmap: Dict[DocID, Document]
+    STOP_WORDS_LIST: ClassVar[List[str]] = stop_words("./data/stopwords.txt")
 
-    def __add_document(self, doc_id: DocID, doc: Document) -> None:
-        doc_tokens = tokenize(doc)
+    index: Dict[Token, Set[DocID]]
+    docmap: Dict[DocID, Movie]
+
+    def __add_document(self, doc_id: DocID, doc: Movie) -> None:
+        doc_tokens = tokenize(f"{doc.title} {doc.description}")
+        doc_tokens = filtered_tokens(InvertedIndex.STOP_WORDS_LIST, doc_tokens)
+        doc_tokens = stem_tokens(doc_tokens)
+        self.docmap[doc_id] = doc
         for doc_token in doc_tokens:
-            self.docmap[doc_id] = doc
             if not self.index.get(doc_token):
                 self.index[doc_token] = set()
             self.index[doc_token].add(doc_id)
@@ -31,9 +34,8 @@ class InvertedIndex(BaseModel):
     def build(self, json_file_name: str) -> None:
         movies_list = load_movies(json_file_name)
         for movie in movies_list.movies:
-            doc = f"{movie.title} - {movie.description}"
             doc_id = movie.id
-            self.__add_document(doc_id, doc)
+            self.__add_document(doc_id, movie)
 
     def save(self) -> None:
         # Make the cache folder. Don't freak if exists
@@ -44,3 +46,11 @@ class InvertedIndex(BaseModel):
         with open(index_file_path, "wb") as index_file, open(docmap_file_path, "wb") as docmap_file:
             dump(self.index, index_file)
             dump(self.docmap, docmap_file)
+
+    def load(self) -> None:
+        cache_folder = Path("./cache")
+        index_file_path = cache_folder / "index.pkl"
+        docmap_file_path = cache_folder / "docmap.pkl"
+        with open(index_file_path, "rb") as index_file, open(docmap_file_path, "rb") as docmap_file:
+            self.index = load(index_file)
+            self.docmap = load(docmap_file)

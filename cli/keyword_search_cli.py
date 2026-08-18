@@ -1,7 +1,7 @@
 import argparse
-from movies import load_movies
+from movies import load_movies, Movie
 from tokenizer import stop_words, filtered_tokens, tokenize, token_found
-from inverted_index import InvertedIndex
+from inverted_index import InvertedIndex, DocID
 
 def search_movies_from_json_file(json_file: str, search_for: str, max_results: int = 5) -> list[str]:
     result: list[str] = []
@@ -20,14 +20,34 @@ def search_movies_from_json_file(json_file: str, search_for: str, max_results: i
     return result
 
 
+def search_command(search_for: str, max_results: int = 5) -> None:
+    i = InvertedIndex(docmap={}, index={})
+    try:
+        i.load()
+    except:
+        print(f"Unable to load indices from disk.  Perhaps build them?")
+        return
+    search_tokens = tokenize(search_for)
+    found_movie_ids: list[DocID] = []
+    for search_token in search_tokens:
+        found_movie_ids.extend(i.get_documents(search_token))
+    result_count = 0
+    print(f"Searching for: {search_for}")
+    print(f"Search results:")
+    for found_id in found_movie_ids:
+        if result_count >= max_results:
+            print(f"Max number ({max_results}) results reached.")
+            break
+        else:
+            print(f"{found_id} {i.docmap[found_id].title}")
+            result_count += 1
+
+
 def build_command() -> None:
     i = InvertedIndex(docmap={}, index={})
     i.build(json_file_name="./data/movies.json")
-    i.save()
-    test_token = "merida"
-    docs = i.get_documents(test_token)
-    print(f"First document for token '{test_token}' = {docs[0]}")
-            
+    i.save()            
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -43,10 +63,7 @@ def main() -> None:
     match args.command:
         case "search":
             # print the search query here
-            print(f"Searching for: {args.query}")
-            search_results = search_movies_from_json_file("./data/movies.json", args.query)
-            for index, title in enumerate(search_results):
-                print(f"{index+1}. {title}")
+            search_command(args.query)
         case "build":
             build_command()
         case _:
