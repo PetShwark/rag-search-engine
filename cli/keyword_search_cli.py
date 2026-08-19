@@ -67,7 +67,8 @@ def idf_command(term: str) -> None:
     print(f"Inverse document frequency of '{term}': {idf:.2f}")
 
 
-def tfa_command(term: str) -> None:
+def tfidf_command(movie_id: int, term: str) -> None:
+    import math
     i = InvertedIndex()
     try:
         i.load()
@@ -78,10 +79,16 @@ def tfa_command(term: str) -> None:
     if len(term_tokens) != 1:
         raise ValueError(f"Term must be one token.  '{term}' is not.")
     term_token = term_tokens[0]
+    movie_count = len(i.docmap)
     term_movies_count = 0
     if i.index.get(term_token):
         term_movies_count = len(i.index[term_token])
-    print(f"Term '{term}' ('{term_token}', tokenized) found in {term_movies_count} movies.")    
+    idf = math.log(float(movie_count + 1) / float(term_movies_count + 1))
+    term_token = term_tokens[0]
+    tf = i.get_tf(movie_id, term_token)
+    tfidf = float(tf) * idf
+    print(f"TF-IDF score of '{term}' ('{term_token}', tokenized) in document '{movie_id}': {tfidf:.2f}")
+
 
 
 def main() -> None:
@@ -97,11 +104,12 @@ def main() -> None:
     tf_parser.add_argument("movie_id", type=int, help="Movie ID number")
     tf_parser.add_argument("term", type=str, help="Search term to get frequency of")
 
-    idf_parser = subparsers.add_parser("idf", help="Calculate the TF-IDF for a given term")
-    idf_parser.add_argument("term", type=str, help="The term for which to calculate the TF-IDF")
+    idf_parser = subparsers.add_parser("idf", help="Calculate the IDF for a given term")
+    idf_parser.add_argument("term", type=str, help="The term for which to calculate the IDF")
 
-    tfa_parser = subparsers.add_parser("tfa", help="Get count of movies with term found")
-    tfa_parser.add_argument("term", type=str, help="The term to search for in the index.")
+    tfidf_parser = subparsers.add_parser("tfidf", help="Calculate the TF-IDF value for the given movie (via ID) and term")
+    tfidf_parser.add_argument("movie_id", type=int, help="Movie ID number")
+    tfidf_parser.add_argument("term", type=str, help="The term for which to calculate the TF-IDF")
 
     args = parser.parse_args()
 
@@ -115,8 +123,8 @@ def main() -> None:
             tf_command(args.movie_id, args.term)
         case "idf":
             idf_command(args.term)
-        case "tfa":
-            tfa_command(args.term)
+        case "tfidf":
+            tfidf_command(args.movie_id, args.term)
         case _:
             parser.print_help()
 
