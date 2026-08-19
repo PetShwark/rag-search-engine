@@ -1,23 +1,6 @@
 import argparse
-from movies import load_movies, Movie
-from tokenizer import stop_words, filtered_tokens, tokenize, token_found, stem_tokens, tokenize_term
+from tokenizer import get_tokens_from_string
 from inverted_index import InvertedIndex, DocID
-
-def search_movies_from_json_file(json_file: str, search_for: str, max_results: int = 5) -> list[str]:
-    result: list[str] = []
-    movie_data = load_movies(json_file)
-    result_count = 0
-    stop_word_tokens = stop_words("./data/stopwords.txt")
-    search_for_tokens = filtered_tokens(filter_out=stop_word_tokens, from_list=tokenize(search_for))
-    for movie in movie_data.movies:
-        if result_count >= max_results:
-            break
-        if movie.title:
-            movie_title_tokens = filtered_tokens(filter_out=stop_word_tokens, from_list=tokenize(movie.title))
-            if token_found(search_for_tokens, movie_title_tokens):
-                result.append(movie.title)
-                result_count += 1
-    return result
 
 
 def search_command(search_for: str, max_results: int = 5) -> None:
@@ -27,7 +10,7 @@ def search_command(search_for: str, max_results: int = 5) -> None:
     except:
         print(f"Unable to load indices from disk.  Perhaps build them?")
         return
-    search_tokens = stem_tokens(filtered_tokens(InvertedIndex.STOP_WORDS_LIST, tokenize(search_for)))
+    search_tokens = get_tokens_from_string(search_for, InvertedIndex.STOP_WORDS_LIST)
     found_movie_ids: list[DocID] = []
     for search_token in search_tokens:
         found_movie_ids.extend(i.get_documents(search_token))
@@ -56,18 +39,49 @@ def tf_command(movie_id: int, term: str) -> None:
     except:
         print(f"Unable to load indices from disk.  Perhaps build them?")
         return
-    try:
-        validate_term = tokenize_term(term) # raises an error if term is not a single token
-    except ValueError:
-        print(f"Search term must be a single token.")
-        return
-    tf = i.get_tf(movie_id, validate_term)
-    print(f"Term frequency of '{validate_term}' in '{i.docmap[movie_id].title}' ({movie_id}) is {tf}")
+    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
+    if len(term_tokens) != 1:
+        raise ValueError(f"Term must be one token.  '{term}' is not.")
+    term_token = term_tokens[0]
+    tf = i.get_tf(movie_id, term_token)
+    print(f"Term frequency of '{term}' ('{term_token}', tokenized) in '{i.docmap[movie_id].title}' ({movie_id}) is {tf}")
 
 
 def idf_command(term: str) -> None:
-    pass
+    import math
+    i = InvertedIndex()
+    try:
+        i.load()
+    except:
+        print(f"Unable to load indices from disk.  Perhaps build them?")
+        return
+    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
+    if len(term_tokens) != 1:
+        raise ValueError(f"Term must be one token.  '{term}' is not.")
+    term_token = term_tokens[0]
+    movie_count = len(i.docmap)
+    term_movies_count = 0
+    if i.index.get(term_token):
+        term_movies_count = len(i.index[term_token])
+    idf = math.log(float(movie_count + 1) / float(term_movies_count + 1))
+    print(f"Inverse document frequency of '{term}': {idf:.2f}")
 
+
+def tfa_command(term: str) -> None:
+    i = InvertedIndex()
+    try:
+        i.load()
+    except:
+        print(f"Unable to load indices from disk.  Perhaps build them?")
+        return
+    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
+    if len(term_tokens) != 1:
+        raise ValueError(f"Term must be one token.  '{term}' is not.")
+    term_token = term_tokens[0]
+    term_movies_count = 0
+    if i.index.get(term_token):
+        term_movies_count = len(i.index[term_token])
+    print(f"Term '{term}' ('{term_token}', tokenized) found in {term_movies_count} movies.")    
 
 
 def main() -> None:
@@ -86,6 +100,9 @@ def main() -> None:
     idf_parser = subparsers.add_parser("idf", help="Calculate the TF-IDF for a given term")
     idf_parser.add_argument("term", type=str, help="The term for which to calculate the TF-IDF")
 
+    tfa_parser = subparsers.add_parser("tfa", help="Get count of movies with term found")
+    tfa_parser.add_argument("term", type=str, help="The term to search for in the index.")
+
     args = parser.parse_args()
 
     match args.command:
@@ -98,6 +115,8 @@ def main() -> None:
             tf_command(args.movie_id, args.term)
         case "idf":
             idf_command(args.term)
+        case "tfa":
+            tfa_command(args.term)
         case _:
             parser.print_help()
 

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Set, ClassVar, Counter
 from pickle import dump, load
 from pathlib import Path
-from tokenizer import tokenize, stop_words, filtered_tokens, stem_tokens
+from tokenizer import stop_words, get_tokens_from_string
 from movies import load_movies, Movie
 
 type Token = str
@@ -22,15 +22,14 @@ class InvertedIndex(BaseModel):
         return result
 
     def __add_document(self, doc_id: DocID, doc: Movie) -> None:
-        doc_tokens = tokenize(f"{doc.title} {doc.description}")
-        doc_tokens = filtered_tokens(InvertedIndex.STOP_WORDS_LIST, doc_tokens)
-        doc_tokens = stem_tokens(doc_tokens)
-        token_set = set(doc_tokens)
+        movie_text = f"{doc.title} {doc.description}"
+        token_list = get_tokens_from_string(movie_text, InvertedIndex.STOP_WORDS_LIST)
+        token_set = set(token_list)
         self.docmap[doc_id] = doc
-        for doc_token in doc_tokens:
+        for token in token_list: # All tokens from movie_text, includes repeats
             if not self.term_frequencies.get(doc_id):
                 self.term_frequencies[doc_id] = Counter()
-            self.term_frequencies[doc_id][doc_token] += 1
+            self.term_frequencies[doc_id][token] += 1
         for token in token_set:
             if not self.index.get(token):
                 self.index[token] = set()

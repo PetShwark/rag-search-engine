@@ -1,29 +1,17 @@
 import string
 from nltk.stem import PorterStemmer
 
-def token_found(search_for: list[str], search_in: list[str]) -> bool:
-    """
-    Looks for the strings in the search_for list in the search_in list of strings.
-    It is assumed that the strings have been tokenized (lowercase-d and punctuation
-    removed).
-    """
-    stemmer = PorterStemmer()
-    for search_in_token in search_in:
-        for search_for_token in search_for:
-            stemmed_search_for_token = stemmer.stem(search_for_token)
-            stemmed_search_in_token = stemmer.stem(search_in_token)
-            if stemmed_search_for_token in stemmed_search_in_token:
-                return True
-    return False
-
-
 def stem_tokens(input_tokens: list[str]) -> list[str]:
     stemmer = PorterStemmer()
     #unique_strings = set()
     result: list[str] = []
-    for input_token in input_tokens:
-        result.append(stemmer.stem(input_token))
+    for input_token in input_tokens:            
+        result.append(stem_token(input_token, stemmer))
     return result
+
+
+def stem_token(input_token: str, stemmer: PorterStemmer) -> str:
+    return stemmer.stem(depunctuate(input_token).lower().strip())
 
 
 def stop_words(filename: str) -> list[str]:
@@ -58,19 +46,26 @@ def depunctuate(input: str) -> str:
 
 def tokenize(input: str) -> list[str]:
     """
-    Takes a string and returns tokens.  The tokens are all in lowercase and
-    devoid of punctuation.
+    Takes a string and returns tokens.  The tokens are all in lowercase,
+    devoid of punctuation, and stemmed.
     """
-    result: list[str] = []
-    words = input.split()
-    for word in words:
-        if word:
-            result.append(depunctuate(word).lower().strip())
-    return result
+    stemmer = PorterStemmer()
+    return list(map(lambda x: stem_token(x, stemmer),filter(None, input.split())))
 
 
 def tokenize_term(input: str) -> str:
     words_found = tokenize(input)
     if len(words_found) != 1:
         raise ValueError("Search term must be one token.")
-    return words_found[0]
+    stemmer = PorterStemmer()
+    return stem_token(depunctuate(words_found[0]).lower().strip(), stemmer)
+
+
+def get_tokens_from_string(search_for: str, stop_words: list[str]) -> list[str]:
+    # Split into words and get rid of blanks
+    tokens_iter = filter(None, search_for.split()) # Iterator
+    # Depuntuate, lowercase and strip whitespace from ends
+    tokens_list = list(map(lambda x: depunctuate(x).lower().strip(),tokens_iter))
+    tokens_list = filtered_tokens(stop_words, tokens_list)
+    stemmed_tokens = stem_tokens(tokens_list)
+    return stemmed_tokens
