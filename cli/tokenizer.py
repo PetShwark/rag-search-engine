@@ -19,10 +19,11 @@ def token_found(search_for: list[str], search_in: list[str]) -> bool:
 
 def stem_tokens(input_tokens: list[str]) -> list[str]:
     stemmer = PorterStemmer()
-    unique_strings = set()
+    #unique_strings = set()
+    result: list[str] = []
     for input_token in input_tokens:
-        unique_strings.add(stemmer.stem(input_token))
-    return list(unique_strings)
+        result.append(stemmer.stem(input_token))
+    return result
 
 
 def stop_words(filename: str) -> list[str]:
@@ -66,3 +67,10 @@ def tokenize(input: str) -> list[str]:
         if word:
             result.append(depunctuate(word).lower().strip())
     return result
+
+
+def tokenize_term(input: str) -> str:
+    words_found = tokenize(input)
+    if len(words_found) != 1:
+        raise ValueError("Search term must be one token.")
+    return words_found[0]
