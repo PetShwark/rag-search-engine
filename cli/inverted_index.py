@@ -4,6 +4,7 @@ from pickle import dump, load
 from pathlib import Path
 from tokenizer import stop_words, get_tokens_from_string
 from movies import load_movies, Movie
+from constants import BM25_K1
 
 type Token = str
 type DocID = int
@@ -14,6 +15,17 @@ class InvertedIndex(BaseModel):
     index: Dict[Token, Set[DocID]] = {}
     docmap: Dict[DocID, Movie] = {}
     term_frequencies: Dict[DocID, Counter] = {}
+
+    def get_bm25_tf(self, doc_id: DocID, term: str, k1: float = BM25_K1) -> float:
+        tf = self.get_tf(doc_id, term)
+        return ((tf * (k1 + 1)) / (tf + k1))
+
+    def get_bm25_idf(self, term: str) -> float:
+        from math import log
+        num_docs = float(len(self.docmap))
+        doc_freq = float(len(self.index[term])) if self.index.get(term) else 0.0
+        bm25_idf = log(((num_docs - doc_freq + 0.5) / (doc_freq + 0.5)) + 1.0)
+        return bm25_idf
 
     def get_tf(self, doc_id: DocID, term: str) -> int:
         result = 0
