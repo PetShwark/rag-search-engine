@@ -4,21 +4,35 @@ from pickle import dump, load
 from pathlib import Path
 from tokenizer import stop_words, get_tokens_from_string
 from movies import load_movies, Movie
-from constants import BM25_K1
+from constants import BM25_K1, BM25_B
 
 type Token = str
 type DocID = int
 
 class InvertedIndex(BaseModel):
     STOP_WORDS_LIST: ClassVar[List[str]] = stop_words("./data/stopwords.txt")
+    CACHE_DIR: ClassVar[Path] = Path("./cache")
+    INDEX_PICKLE_PATH: ClassVar[Path] = CACHE_DIR / "index.pkl"
+    DOCMAP_PICKLE_PATH: ClassVar[Path] = CACHE_DIR / "docmap.pkl"
+    TERM_FREQ_PICKLE_PATH: ClassVar[Path] = CACHE_DIR / "term_frequencies.pkl"
+    DOC_LENGTHS_PICKLE_PATH: ClassVar[Path] = CACHE_DIR / "doc_lengths.pkl"
 
     index: Dict[Token, Set[DocID]] = {}
     docmap: Dict[DocID, Movie] = {}
     term_frequencies: Dict[DocID, Counter] = {}
+    doc_lengths: Dict[DocID, int] = {}
 
-    def get_bm25_tf(self, doc_id: DocID, term: str, k1: float = BM25_K1) -> float:
+    def __get_avg_doc_length(self) -> float:
+        num_docs = len(self.docmap)
+        if num_docs == 0:
+            return 0.0
+        sum_doc_lengths = sum(self.doc_lengths.values())
+        return float(sum_doc_lengths) / float(num_docs)
+
+    def get_bm25_tf(self, doc_id: DocID, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
+        length_norm = 1 - b + (b * self.doc_lengths[doc_id] / self.__get_avg_doc_length())
         tf = self.get_tf(doc_id, term)
-        return ((tf * (k1 + 1)) / (tf + k1))
+        return ((tf * (k1 + 1)) / (tf + (k1 * length_norm)))
 
     def get_bm25_idf(self, term: str) -> float:
         from math import log
@@ -38,6 +52,7 @@ class InvertedIndex(BaseModel):
         token_list = get_tokens_from_string(movie_text, InvertedIndex.STOP_WORDS_LIST)
         token_set = set(token_list)
         self.docmap[doc_id] = doc
+        self.doc_lengths[doc_id] = len(token_list)
         for token in token_list: # All tokens from movie_text, includes repeats
             if not self.term_frequencies.get(doc_id):
                 self.term_frequencies[doc_id] = Counter()
@@ -46,7 +61,6 @@ class InvertedIndex(BaseModel):
             if not self.index.get(token):
                 self.index[token] = set()
             self.index[token].add(doc_id)
-
 
     def get_documents(self, term: Token) -> List[DocID]:
         result: List[DocID] = []
@@ -63,26 +77,22 @@ class InvertedIndex(BaseModel):
 
     def save(self) -> None:
         # Make the cache folder. Don't freak if exists
-        cache_folder = Path("./cache")
-        cache_folder.mkdir(parents=True, exist_ok=True)
-        index_file_path = cache_folder / "index.pkl"
-        docmap_file_path = cache_folder / "docmap.pkl"
-        term_frequencies_file_path = cache_folder / "term_frequencies.pkl"
-        with open(index_file_path, "wb") as index_file, \
-            open(docmap_file_path, "wb") as docmap_file, \
-            open(term_frequencies_file_path, "wb") as term_frequencies_file:
+        InvertedIndex.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(InvertedIndex.INDEX_PICKLE_PATH, "wb") as index_file, \
+            open(InvertedIndex.DOCMAP_PICKLE_PATH, "wb") as docmap_file, \
+            open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "wb") as term_frequencies_file, \
+            open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "wb") as doc_lengths_file:
             dump(self.index, index_file)
             dump(self.docmap, docmap_file)
             dump(self.term_frequencies, term_frequencies_file)
+            dump(self.doc_lengths, doc_lengths_file)
 
     def load(self) -> None:
-        cache_folder = Path("./cache")
-        index_file_path = cache_folder / "index.pkl"
-        docmap_file_path = cache_folder / "docmap.pkl"
-        term_frequencies_file_path = cache_folder / "term_frequencies.pkl"
-        with open(index_file_path, "rb") as index_file, \
-            open(docmap_file_path, "rb") as docmap_file, \
-            open(term_frequencies_file_path, "rb") as term_frequencies_file:
+        with open(InvertedIndex.INDEX_PICKLE_PATH, "rb") as index_file, \
+            open(InvertedIndex.DOCMAP_PICKLE_PATH, "rb") as docmap_file, \
+            open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "rb") as term_frequencies_file, \
+            open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "rb") as doc_lengths_file:
             self.index = load(index_file)
             self.docmap = load(docmap_file)
             self.term_frequencies = load(term_frequencies_file)
+            self.doc_lengths = load(doc_lengths_file)

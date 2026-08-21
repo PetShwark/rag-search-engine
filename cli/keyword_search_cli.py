@@ -1,7 +1,7 @@
 import argparse
 from tokenizer import get_tokens_from_string
 from inverted_index import InvertedIndex, DocID
-from constants import BM25_K1
+from constants import BM25_K1, BM25_B
 
 
 def search_command(search_for: str, max_results: int = 5) -> None:
@@ -105,7 +105,7 @@ def bm25_idf_command(term: str) -> float:
     return i.get_bm25_idf(term_token)
 
 
-def bm25_tf_command(movie_id: int, term: str, k1: float) -> float:
+def bm25_tf_command(movie_id: int, term: str, k1: float, b: float) -> float:
     i = InvertedIndex()
     try:
         i.load()
@@ -116,7 +116,7 @@ def bm25_tf_command(movie_id: int, term: str, k1: float) -> float:
     if len(term_tokens) != 1:
         raise ValueError(f"Term must be one token.  '{term}' is not.")
     term_token = term_tokens[0]
-    return i.get_bm25_tf(movie_id, term_token, k1)
+    return i.get_bm25_tf(movie_id, term_token, k1, b)
 
 
 def main() -> None:
@@ -146,6 +146,8 @@ def main() -> None:
     bm25tf_parser.add_argument("movie_id", type=int, help="Movie ID number")
     bm25tf_parser.add_argument("term", type=str, help="The term for which to calculate the BM25-TF")
     bm25tf_parser.add_argument("k1", type=float, nargs="?", default=BM25_K1, help="Tunable BM25 K1 parameter")
+    bm25tf_parser.add_argument("b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter"
+)
 
     args = parser.parse_args()
 
@@ -166,7 +168,8 @@ def main() -> None:
             print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
         case "bm25tf":
             print(f"K1 is {args.k1}")
-            bm25tf = bm25_tf_command(args.movie_id, args.term, args.k1)
+            print(f"B is {args.b}")
+            bm25tf = bm25_tf_command(args.movie_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.movie_id}': {bm25tf:.2f}")
         case _:
             parser.print_help()
