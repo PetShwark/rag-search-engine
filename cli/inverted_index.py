@@ -2,12 +2,26 @@ from pydantic import BaseModel
 from typing import List, Dict, Set, ClassVar, Counter
 from pickle import dump, load
 from pathlib import Path
-from tokenizer import stop_words, get_tokens_from_string
+from tqdm import tqdm
+from tokenizer import get_tokens_from_string, depunctuate
 from movies import load_movies, Movie
 from constants import BM25_K1, BM25_B
 
 type Token = str
 type DocID = int
+
+
+def stop_words(filename: str) -> list[str]:
+    """
+    Gets the stop words from the named file and processes them into tokens.  It returns the list of tokens.
+    """
+    result: list[str] = []
+    with open(filename, "r") as file:
+        lines = file.read().splitlines()
+    for word in lines:
+        result.append(depunctuate(word).lower().strip())
+    return result
+
 
 class InvertedIndex(BaseModel):
     STOP_WORDS_LIST: ClassVar[List[str]] = stop_words("./data/stopwords.txt")
@@ -70,8 +84,9 @@ class InvertedIndex(BaseModel):
         return result
 
     def build(self, json_file_name: str) -> None:
+        print(f"Reading {json_file_name}...")
         movies_list = load_movies(json_file_name)
-        for movie in movies_list.movies:
+        for movie in tqdm(movies_list.movies):
             doc_id = movie.id
             self.__add_document(doc_id, movie)
 
@@ -82,17 +97,27 @@ class InvertedIndex(BaseModel):
             open(InvertedIndex.DOCMAP_PICKLE_PATH, "wb") as docmap_file, \
             open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "wb") as term_frequencies_file, \
             open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "wb") as doc_lengths_file:
+            print("Saving index...")
             dump(self.index, index_file)
+            print("Saving docmap...")
             dump(self.docmap, docmap_file)
+            print("Saving term frequencies...")
             dump(self.term_frequencies, term_frequencies_file)
+            print("Saving document lengths...")
             dump(self.doc_lengths, doc_lengths_file)
+            print("Done.")
 
     def load(self) -> None:
         with open(InvertedIndex.INDEX_PICKLE_PATH, "rb") as index_file, \
             open(InvertedIndex.DOCMAP_PICKLE_PATH, "rb") as docmap_file, \
             open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "rb") as term_frequencies_file, \
             open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "rb") as doc_lengths_file:
+            print("Loading index...")
             self.index = load(index_file)
+            print("Loading docmap...")
             self.docmap = load(docmap_file)
+            print("Loading term frequencies...")
             self.term_frequencies = load(term_frequencies_file)
+            print("Loading document lengths...")
             self.doc_lengths = load(doc_lengths_file)
+            print("Done.\n")
