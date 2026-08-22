@@ -1,6 +1,6 @@
 import argparse
 import math
-from tokenizer import get_tokens_from_string
+from tokenizer import get_tokens_from_string, validate_single_token_from_string
 from inverted_index import InvertedIndex, DocID
 from constants import BM25_K1, BM25_B
 
@@ -17,6 +17,10 @@ def load_index(i: InvertedIndex) -> InvertedIndex | None:
     return i
 
 def search_command(i: InvertedIndex, search_for: str, max_results: int = 5) -> None:
+    """
+    Command function for searching for movies given search terms in a string.
+    Uses the term index in the given InvertedIndex for matching.
+    """
     if not (loaded_index := load_index(i)):
         return
     search_tokens = get_tokens_from_string(search_for, InvertedIndex.STOP_WORDS_LIST)
@@ -36,6 +40,15 @@ def search_command(i: InvertedIndex, search_for: str, max_results: int = 5) -> N
 
 
 def build_command(i: InvertedIndex) -> None:
+    """
+    Command function to build and save the InvertedIndex object.
+    1) Pulls in the JSON file of movie data.
+    2) Processes movie data structure to create the docmap, index, 
+        term_frequencies, and doc_lengths data structures.
+    3) Saves the data from the above structures into Python pickle 
+        files in the './cache' folder (assumes running tool in the
+        project root folder)
+    """
     print("Building index from './data/movies.json'...")
     i.build(json_file_name="./data/movies.json")
     print("Saving pickles to './cache'...")
@@ -44,70 +57,81 @@ def build_command(i: InvertedIndex) -> None:
 
 
 def tf_command(i: InvertedIndex, movie_id: int, term: str) -> None:
+    """
+    Command function for pulling up the TF for a given movie and term.
+    The 'term' string must contain ONE token or a ValueError is raised.
+    """
     if not (loaded_index := load_index(i)):
         return    
-    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
-    if len(term_tokens) != 1:
-        raise ValueError(f"Term must be one token.  '{term}' is not.")
-    term_token = term_tokens[0]
+    term_token = validate_single_token_from_string(term, InvertedIndex.STOP_WORDS_LIST) #RAISES
     tf = loaded_index.get_tf(movie_id, term_token)
     print(f"Term frequency of '{term}' ('{term_token}', tokenized) in '{loaded_index.docmap[movie_id].title}' ({movie_id}) is {tf}")
 
 
 def idf_command(i: InvertedIndex, term: str) -> None:
+    """
+    Command function for calculating the IDF for a given term.
+    The 'term' string must contain ONE token or a ValueError is raised.
+    """
     if not (loaded_index := load_index(i)):
         return
-    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
-    if len(term_tokens) != 1:
-        raise ValueError(f"Term must be one token.  '{term}' is not.")
-    term_token = term_tokens[0]
+    term_token = validate_single_token_from_string(term, InvertedIndex.STOP_WORDS_LIST) #RAISES
     movie_count = len(loaded_index.docmap)
-    term_movies_count = 0
-    if loaded_index.index.get(term_token):
-        term_movies_count = len(loaded_index.index[term_token])
+    term_movies_count = len(loaded_index.index[term_token]) if loaded_index.index.get(term_token) else 0
     idf = math.log(float(movie_count + 1) / float(term_movies_count + 1))
+    print(f"Movie count: {movie_count}")
+    print(f"Movies with term: {term_movies_count}")
     print(f"Inverse document frequency of '{term}': {idf:.2f}")
 
 
 def tfidf_command(i: InvertedIndex, movie_id: int, term: str) -> None:
+    """
+    Command function for calculating the TF-IDF for a given movie and term.
+    The 'term' string must contain ONE token or a ValueError is raised.
+    """
     if not (loaded_index := load_index(i)):
         return
-    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST) # raises an error if term is not a single word
-    if len(term_tokens) != 1:
-        raise ValueError(f"Term must be one token.  '{term}' is not.")
-    term_token = term_tokens[0]
+    term_token = validate_single_token_from_string(term, InvertedIndex.STOP_WORDS_LIST) #RAISES
     movie_count = len(loaded_index.docmap)
-    term_movies_count = 0
-    if loaded_index.index.get(term_token):
-        term_movies_count = len(loaded_index.index[term_token])
+    term_movies_count = len(loaded_index.index[term_token]) if loaded_index.index.get(term_token) else 0
     idf = math.log(float(movie_count + 1) / float(term_movies_count + 1))
-    term_token = term_tokens[0]
     tf = loaded_index.get_tf(movie_id, term_token)
     tfidf = float(tf) * idf
+    print(f"Movies with term: {term_movies_count}")
+    print(f"IDF: {idf}")
+    print(f"TF: {tf}")
     print(f"TF-IDF score of '{term}' ('{term_token}', tokenized) in document '{movie_id}': {tfidf:.2f}")
 
 
 def bm25_idf_command(i: InvertedIndex, term: str) -> float:
+    """
+    Command function for calculating the BM25 IDF for a given term.
+    The 'term' string must contain ONE token or a ValueError is raised.
+    """
     if not (loaded_index := load_index(i)):
         return 0.0
-    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST)
-    if len(term_tokens) != 1:
-        raise ValueError(f"Term must be one token.  '{term}' is not.")
-    term_token = term_tokens[0]
+    term_token = validate_single_token_from_string(term, InvertedIndex.STOP_WORDS_LIST) #RAISES
     return loaded_index.get_bm25_idf(term_token)
 
 
 def bm25_tf_command(i: InvertedIndex, movie_id: int, term: str, k1: float, b: float) -> float:
+    """
+    Command function for calculating the BM25 TF for a given movie and term.
+    The 'term' string must contain ONE token or a ValueError is raised.
+    The tuning parameters k1 and b [0.0 <-> 1.0] may be provided.
+    """
     if not (loaded_index := load_index(i)):
         return 0.0
-    term_tokens = get_tokens_from_string(term, InvertedIndex.STOP_WORDS_LIST)
-    if len(term_tokens) != 1:
-        raise ValueError(f"Term must be one token.  '{term}' is not.")
-    term_token = term_tokens[0]
+    term_token = validate_single_token_from_string(term, InvertedIndex.STOP_WORDS_LIST)
     return loaded_index.get_bm25_tf(movie_id, term_token, k1, b)
 
 
 def doc_lengths_command(i: InvertedIndex, movie_id: int) -> None:
+    """
+    Command function to pull up the entire list of doc_lengths in the InvertedIndex, or
+    (if a non-zero movie_id is given) the doc_length for a given movie (None if movie_id
+    doesn't exist).
+    """
     if not (loaded_index := load_index(i)):
         return
     if movie_id > 0:

@@ -72,8 +72,8 @@ def get_tokens_from_string(input: str, stop_words: list[str]) -> list[str]:
     """
     filtered_word_list = \
         filtered_words(
-            stop_words, 
-            list(
+            filter_out = stop_words, 
+            from_list = list(
                 map(
                     lambda x: depunctuate(x).lower().strip(),
                     filter(None, input.split())
@@ -82,3 +82,16 @@ def get_tokens_from_string(input: str, stop_words: list[str]) -> list[str]:
         )
     stemmed_tokens = stem_words(filtered_word_list)
     return stemmed_tokens
+
+
+def validate_single_token_from_string(input:str, stop_words) -> str:
+    """
+    For measures that need a single token as input, this function validates
+    that situation.  Given a string that should have a single token in it, 
+    the string is processed for tokens.  If MORE THAN ONE token is in the input,
+    a ValueError is raised.  Otherwise, the processed token is returned.
+    """
+    tokens = get_tokens_from_string(input, stop_words)
+    if len(tokens) != 1:
+        raise ValueError(f"Term must be one token.  '{input}' is not.")
+    return tokens[0]

@@ -44,8 +44,14 @@ class InvertedIndex(BaseModel):
         return float(sum_doc_lengths) / float(num_docs)
 
     def get_bm25_tf(self, doc_id: DocID, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
-        length_norm = 1 - b + (b * self.doc_lengths[doc_id] / self.__get_avg_doc_length())
+        this_doc_length = self.doc_lengths[doc_id]
+        avg_doc_length = self.__get_avg_doc_length()
+        length_norm = 1 - b + (b * this_doc_length / avg_doc_length)
         tf = self.get_tf(doc_id, term)
+        print(f"Doc length: {this_doc_length}")
+        print(f"Avg Doc length: {avg_doc_length}")
+        print(f"Length norm: {length_norm}")
+        print(f"TF: {tf}")
         return ((tf * (k1 + 1)) / (tf + (k1 * length_norm)))
 
     def get_bm25_idf(self, term: str) -> float:
