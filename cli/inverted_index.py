@@ -48,11 +48,11 @@ class InvertedIndex(BaseModel):
         avg_doc_length = self.__get_avg_doc_length()
         length_norm = 1 - b + (b * this_doc_length / avg_doc_length)
         tf = self.get_tf(doc_id, term)
-        print(f"Doc length: {this_doc_length}")
-        print(f"Avg Doc length: {avg_doc_length}")
-        print(f"Length norm: {length_norm}")
-        print(f"TF: {tf}")
-        return ((tf * (k1 + 1)) / (tf + (k1 * length_norm)))
+        # print(f"Doc length: {this_doc_length}")
+        # print(f"Avg Doc length: {avg_doc_length}")
+        # print(f"Length norm: {length_norm}")
+        # print(f"TF: {tf}")
+        return ((float(tf) * (k1 + 1)) / (float(tf) + (k1 * length_norm)))
 
     def get_bm25_idf(self, term: str) -> float:
         from math import log
@@ -127,3 +127,19 @@ class InvertedIndex(BaseModel):
             print("Loading document lengths...")
             self.doc_lengths = load(doc_lengths_file)
             print("Done.\n")
+
+    def bm25(self, doc_id: DocID, term: str, k1: float, b: float) -> float:
+        return self.get_bm25_tf(doc_id, term, k1, b) * self.get_bm25_idf(term)
+
+    def bm25search(self, query: str, limit: int, k1: float, b: float) -> dict[DocID, float]:
+        query_tokens = get_tokens_from_string(query, InvertedIndex.STOP_WORDS_LIST)
+        print(f"Tokens from processed query string: {" ".join(query_tokens)}")
+        accumulator: dict[DocID, float] = {}
+        for query_token in query_tokens:
+            movies_for_token = self.index.get(query_token, set())
+            for movie_id in movies_for_token:
+                accumulator[movie_id] = accumulator.get(movie_id, 0.0) + self.bm25(movie_id, query_token, k1, b)
+        sorted_accumulator = dict(sorted(accumulator.items(), key=lambda item: item[1], reverse=True))
+        new_limit = min(limit, len(sorted_accumulator))
+        return {movie_id: score for index, (movie_id, score) in enumerate(sorted_accumulator.items()) if index < new_limit}
+

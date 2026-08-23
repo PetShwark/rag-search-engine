@@ -2,7 +2,7 @@ import argparse
 import math
 from tokenizer import get_tokens_from_string, validate_single_token_from_string
 from inverted_index import InvertedIndex, DocID
-from constants import BM25_K1, BM25_B
+from constants import BM25_K1, BM25_B, QUERY_RESULT_DEFAULT_LIMIT
 
 def load_index(i: InvertedIndex) -> InvertedIndex | None:
     """
@@ -147,13 +147,27 @@ def docinfo_command(i: InvertedIndex, movie_id: int) -> None:
     """
     if not (loaded_index := load_index(i)):
         return
-    if movie_info := i.docmap.get(movie_id):
+    if movie_info := loaded_index.docmap.get(movie_id):
         print(f"Move ({movie_id}) info:")
-        print(f"Title: {i.docmap[movie_id].title}")
+        print(f"Title: {movie_info.title}")
         print(f"Description:")
-        print(f"{i.docmap[movie_id].description}")
+        print(f"{movie_info.description}")
     else:
         print(f"No movie with ID={movie_id}")
+
+
+def bm25search_command(i: InvertedIndex, query: str, max_results: int, k1: float, b: float) -> None:
+    print(f"Searching for '{query}'...")
+    if not (loaded_index := load_index(i)):
+        return
+    results = loaded_index.bm25search(query, max_results, k1, b)
+    if results:
+        print("Found:")
+        for index, (movie_id, score) in enumerate(results.items()):
+            print(f"{index+1}. ({movie_id}) {loaded_index.docmap[movie_id].title} - Score: {score:.2f}")
+    else:
+        print("Found no results.")
+    pass
 
 
 def main() -> None:
@@ -162,6 +176,7 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
+    search_parser.add_argument("limit", type=int, nargs="?", default=QUERY_RESULT_DEFAULT_LIMIT, help="Max number search results to return")
 
     subparsers.add_parser("build", help="Import movie data and build indices")
 
@@ -191,13 +206,19 @@ def main() -> None:
     docinfo_parser = subparsers.add_parser("docinfo", help="Get the info from the docmap for a given ID.")
     docinfo_parser.add_argument("movie_id", type=int, help="Movie ID number")
 
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument("limit", type=int, nargs="?", default=QUERY_RESULT_DEFAULT_LIMIT, help="Max number search results to return")
+    bm25search_parser.add_argument("k1", type=float, nargs="?", default=BM25_K1, help="Tunable BM K1 parameter")
+    bm25search_parser.add_argument("b", type=float, nargs="?", default=BM25_B, help="Tunable BM B parameter")
+
     args = parser.parse_args()
 
     i = InvertedIndex() #Need an InvertedIndex object for nearly every command
 
     match args.command:
         case "search":
-            search_command(i, args.query)
+            search_command(i, args.query, args.limit)
         case "build":
             build_command(i)
         case "tf":
@@ -218,6 +239,8 @@ def main() -> None:
             doc_lengths_command(i, args.movie_id)
         case "docinfo":
             docinfo_command(i, args.movie_id)
+        case "bm25search":
+            bm25search_command(i, args.query, args.limit, args.k1, args.b)
         case _:
             parser.print_help()
 
