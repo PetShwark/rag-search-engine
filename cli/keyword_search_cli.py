@@ -141,6 +141,21 @@ def doc_lengths_command(i: InvertedIndex, movie_id: int) -> None:
         print(loaded_index.doc_lengths)
 
 
+def docinfo_command(i: InvertedIndex, movie_id: int) -> None:
+    """
+    Command function to pull up the docmap info for a given ID.
+    """
+    if not (loaded_index := load_index(i)):
+        return
+    if movie_info := i.docmap.get(movie_id):
+        print(f"Move ({movie_id}) info:")
+        print(f"Title: {i.docmap[movie_id].title}")
+        print(f"Description:")
+        print(f"{i.docmap[movie_id].description}")
+    else:
+        print(f"No movie with ID={movie_id}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -173,13 +188,15 @@ def main() -> None:
     doc_lengths_parser = subparsers.add_parser("doclengths", help="Dump the doc_lengths dictionary")
     doc_lengths_parser.add_argument("movie_id", type=int, nargs="?", default=0, help="Movie ID number (optional)")
 
+    docinfo_parser = subparsers.add_parser("docinfo", help="Get the info from the docmap for a given ID.")
+    docinfo_parser.add_argument("movie_id", type=int, help="Movie ID number")
+
     args = parser.parse_args()
 
-    i = InvertedIndex()
+    i = InvertedIndex() #Need an InvertedIndex object for nearly every command
 
     match args.command:
         case "search":
-            # print the search query here
             search_command(i, args.query)
         case "build":
             build_command(i)
@@ -199,6 +216,8 @@ def main() -> None:
             print(f"BM25 TF score of '{args.term}' in document '{args.movie_id}': {bm25tf:.2f}")
         case "doclengths":
             doc_lengths_command(i, args.movie_id)
+        case "docinfo":
+            docinfo_command(i, args.movie_id)
         case _:
             parser.print_help()
 
