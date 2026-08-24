@@ -16,7 +16,8 @@ class SemanticSearch:
         self.document_map = {}
 
     def generate_embedding(self, text: str):
-        if len(text.strip()) == 0:
+        text = text.strip()
+        if len(text) == 0:
             raise ValueError("The 'text' parameter must be a non-empty string with content other than whitespace.")
         encoded_result = self.model.encode([text])
         return encoded_result[0]
@@ -70,3 +71,10 @@ def verify_embeddings() -> None:
     print(
         f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions"
     )
+
+def embed_query_text(query: str) -> None:
+    semsearch = SemanticSearch()
+    embedding = semsearch.generate_embedding(query)
+    print(f"Query: {query}")
+    print(f"First 3 dimensions: {embedding[:3]}")
+    print(f"Shape: {embedding.shape}")
