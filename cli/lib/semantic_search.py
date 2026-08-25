@@ -3,6 +3,7 @@ import numpy as np
 from movies import Movie, load_movies
 from pathlib import Path
 from tqdm import tqdm
+import re
 
 
 class SemanticSearch:
@@ -153,5 +154,28 @@ def chunk_command(text: str, chunk_size: int, overlap: int) -> None:
     if chunk_begin < len(words):
         chunks.append(" ".join(words[chunk_begin:]))
     print(f"Chunking {len(text.strip())} characters")
+    for i, chunk in enumerate(chunks):
+        print(f"{i+1}. {chunk}")
+
+
+def semantic_chunk_command(text: str, max_chunk_size: int, overlap: int) -> None:
+    """
+    Chunks on sentence boundaries, then merges sentences into chunks of size <= max_chunk_size, with overlap between chunks.
+    """
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    if overlap < 0 or overlap >= max_chunk_size:
+        raise ValueError("overlap must be >= 0 and < max_chunk_size")
+    chunk_begin = 0
+    chunk_end = max_chunk_size
+    chunks: list[str] = []
+    while chunk_end < len(sentences):
+        # print(f"begin: {chunk_begin}, end: {chunk_end}")
+        chunks.append(" ".join(sentences[chunk_begin:chunk_end]))
+        chunk_begin += max_chunk_size - overlap
+        chunk_end += max_chunk_size - overlap
+    # print(f"begin: {chunk_begin}, end: {chunk_end}")
+    if chunk_begin < len(sentences):
+        chunks.append(" ".join(sentences[chunk_begin:]))
+    print(f"Semantically chunking {len(text.strip())} characters")
     for i, chunk in enumerate(chunks):
         print(f"{i+1}. {chunk}")
