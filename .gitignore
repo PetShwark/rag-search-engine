@@ -13,3 +13,6 @@ wheels/
 data/
 cache/
 .vscode/
+
+# macOS
+.DS_Store

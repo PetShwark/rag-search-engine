@@ -1,5 +1,14 @@
 import argparse
-from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text, search_command, chunk_command, semantic_chunk_command
+from lib.semantic_search \
+    import verify_model, \
+        embed_text, \
+        verify_embeddings, \
+        embed_query_text, \
+        search_command, \
+        chunk_command, \
+        semantic_chunk_command, \
+        embed_chunks_command, \
+        search_chunked_command
 from constants import QUERY_RESULT_DEFAULT_LIMIT, CHUNK_DEFAULT_SIZE, OVERLAP_DEFAULT, SEMANTIC_CHUNK_DEFAULT_SIZE, SEMANTIC_OVERLAP_DEFAULT
 
 
@@ -72,6 +81,28 @@ def main() -> None:
         help="Words to overlap per chunk"
     )
 
+    embed_chunks_parser = subparsers.add_parser(
+        "embed_chunks",
+        help="Load or build chunk embeddings."
+    )
+
+    search_chunked_parser = subparsers.add_parser(
+        "search_chunked",
+        help="Use chunked semantic search for best query match."
+    )
+    search_chunked_parser.add_argument(
+        "query",
+        type=str,
+        help="Query string on which to search"
+    )
+    search_chunked_parser.add_argument(
+        "--limit",
+        type=int,
+        nargs="?",
+        default=5,
+        help="Limit number of results to this integer"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -90,6 +121,10 @@ def main() -> None:
         case "semantic_chunk":
             semantic_chunk_command(
                 args.text, args.max_chunk_size, args.overlap)
+        case "embed_chunks":
+            embed_chunks_command()
+        case "search_chunked":
+            search_chunked_command(args.query, args.limit)
         case _:
             parser.print_help()
 
