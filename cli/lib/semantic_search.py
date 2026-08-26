@@ -307,7 +307,12 @@ def semantic_chunk(text: str, max_chunk_size: int, overlap: int) -> list[str]:
     """
     Chunks on sentence boundaries, then merges sentences into chunks of size <= max_chunk_size, with overlap between chunks.
     """
-    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    if len(text.strip()) == 0:
+        return []
+    # Strip first, then split on punctuation (if any), then filter out empty strings
+    sentences = list(filter(None, map(lambda x: x.strip(), re.split(r"(?<=[.!?])\s+", text.strip()))))
+    if len(sentences) == 1 and not sentences[0].endswith(('.','?','!')):
+        return [ text.strip() ]
     if overlap < 0 or overlap >= max_chunk_size:
         raise ValueError("overlap must be >= 0 and < max_chunk_size")
     chunk_begin = 0
