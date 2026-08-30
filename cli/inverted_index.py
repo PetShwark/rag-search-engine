@@ -128,17 +128,17 @@ class InvertedIndex(BaseModel):
             self.doc_lengths = load(doc_lengths_file)
             print("Done.\n")
 
-    def bm25(self, doc_id: DocID, term: str, k1: float, b: float) -> float:
-        return self.get_bm25_tf(doc_id, term, k1, b) * self.get_bm25_idf(term)
+    def bm25(self, doc_id: DocID, term: str) -> float:
+        return self.get_bm25_tf(doc_id, term, BM25_K1, BM25_B) * self.get_bm25_idf(term)
 
-    def bm25search(self, query: str, limit: int, k1: float, b: float) -> dict[DocID, float]:
+    def bm25search(self, query: str, limit: int) -> dict[DocID, float]:
         query_tokens = get_tokens_from_string(query, InvertedIndex.STOP_WORDS_LIST)
         print(f"Tokens from processed query string: {" ".join(query_tokens)}")
         accumulator: dict[DocID, float] = {}
         for query_token in query_tokens:
             movies_for_token = self.index.get(query_token, set())
             for movie_id in movies_for_token:
-                accumulator[movie_id] = accumulator.get(movie_id, 0.0) + self.bm25(movie_id, query_token, k1, b)
+                accumulator[movie_id] = accumulator.get(movie_id, 0.0) + self.bm25(movie_id, query_token)
         sorted_accumulator = dict(sorted(accumulator.items(), key=lambda item: item[1], reverse=True))
         new_limit = min(limit, len(sorted_accumulator))
         return {movie_id: score for index, (movie_id, score) in enumerate(sorted_accumulator.items()) if index < new_limit}
