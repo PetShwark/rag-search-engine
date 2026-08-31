@@ -57,8 +57,13 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--enhance",
         type=str,
-        nargs="?",
         choices=["spell", "rewrite", "expand"],
+        help="Query enhancement method"
+    )
+    rrf_search_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        choices=["individual"],
         help="Query enhancement method"
     )
 
@@ -73,7 +78,7 @@ def main() -> None:
             print(f"Query: {args.query}")
             print(f"k is {args.k}")
             print(f"limit is {args.limit}")
-            rrf_search_command(args.query, args.k, args.limit, args.enhance)
+            rrf_search_command(args.query, args.k, args.limit, args.enhance, args.rerank_method)
         case _:
             parser.print_help()
 

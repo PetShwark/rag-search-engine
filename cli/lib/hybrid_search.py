@@ -1,11 +1,13 @@
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, TYPE_CHECKING
 
 from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
 from movies import Movie
-from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query
+from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query, llm_rerank_rrf_search_results
+if TYPE_CHECKING:
+    from inverted_index import DocID
 
 
 class HybridScoreData(TypedDict):
@@ -28,7 +30,7 @@ class RRFScoreData(TypedDict):
 
 
 class RRFScoreRecord(TypedDict):
-    id: int
+    id: DocID
     data: RRFScoreData
 
 
@@ -206,7 +208,7 @@ def weighted_search_command(query: str, alpha: float, limit: int) -> None:
         print(f"\t{result['data']['document']:.80}")
 
 
-def rrf_search_command(query: str, k: float, limit: int, enhance: str) -> None:
+def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_method: str) -> None:
     old_query = query
     new_query: str | None = None
     # If the enhance string exists, do some enhancing of the query
@@ -223,9 +225,28 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str) -> None:
         print(f"Enhanced query ({enhance}): '{old_query}' -> '{new_query}'\n")
     documents = load_movies(HybridSearch.MOVIES_JSON_FILE.__str__())
     hybrid_search = HybridSearch(documents.movies)
-    search_results = hybrid_search.rrf_search(new_query if new_query else old_query, k, limit)
-    for index, result in enumerate(search_results):
-        print(f"{index+1}. {hybrid_search.idx.docmap[result['id']].title}")
-        print(f"\tRRF score: {result['data']['rrf_score']}")
-        print(f"\tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}")
-        print(f"\t{result['data']['document']:.80}")
+    match rerank_method:
+        case "individual":
+            query_used = new_query if new_query else old_query
+            # Jack up the number of results by five times
+            search_results = hybrid_search.rrf_search(query_used, k, limit * 5)
+            print(f"Reranking top {limit} results using individual method...")
+            sorted_scored_search_results = llm_rerank_rrf_search_results(query_used, search_results, hybrid_search.idx.docmap)
+            print(f"Reciprocal Rank Fusion results for '{query_used}' (k={k})")
+            for index, (llm_rating, result) in enumerate(sorted_scored_search_results):
+                if index >= limit:
+                    break
+                print(f"{index+1}. {hybrid_search.idx.docmap[result['id']].title}")
+                print(f"Re-rank Score: {llm_rating:.3f}/10")
+                print(f"RRF Score: {result['data']['rrf_score']}")
+                print(f"\tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}")
+                print(f"\t{result['data']['document']:.80}")
+        case _:
+            search_results = hybrid_search.rrf_search(new_query if new_query else old_query, k, limit)
+            for index, result in enumerate(search_results):
+                print(f"{index+1}. {hybrid_search.idx.docmap[result['id']].title}")
+                print(f"\tRRF score: {result['data']['rrf_score']}")
+                print(f"\tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}")
+                print(f"\t{result['data']['document']:.80}")
+            
+
