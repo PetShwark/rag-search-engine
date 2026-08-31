@@ -58,7 +58,7 @@ def main() -> None:
         "--enhance",
         type=str,
         nargs="?",
-        choices=["spell"],
+        choices=["spell", "rewrite"],
         help="Query enhancement method"
     )
 

@@ -5,7 +5,7 @@ from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
 from movies import Movie
-from .llm_stuff import llm_spell_check
+from .llm_stuff import llm_spell_check, llm_rewrite_query
 
 
 class HybridScoreData(TypedDict):
@@ -208,15 +208,20 @@ def weighted_search_command(query: str, alpha: float, limit: int) -> None:
 
 def rrf_search_command(query: str, k: float, limit: int, enhance: str) -> None:
     old_query = query
-    fixed_query: str | None = None
+    new_query: str | None = None
     # If the enhance string exists, do some enhancing of the query
-    if enhance:
-        if enhance == "spell":
-            fixed_query = llm_spell_check(query)
-            print(f"Enhanced query ({enhance}): '{old_query}' -> '{fixed_query}'\n")
+    match enhance:
+        case "spell":
+            new_query = llm_spell_check(query)
+            print(f"Enhanced qxuery ({enhance}): '{old_query}' -> '{new_query}'\n")
+        case "rewrite":
+            new_query = llm_rewrite_query(query)
+            print(f"Enhanced query ({enhance}): '{old_query}' -> '{new_query}'\n")
+        case _:
+            new_query = None
     documents = load_movies(HybridSearch.MOVIES_JSON_FILE.__str__())
     hybrid_search = HybridSearch(documents.movies)
-    search_results = hybrid_search.rrf_search(fixed_query if fixed_query else old_query, k, limit)
+    search_results = hybrid_search.rrf_search(new_query if new_query else old_query, k, limit)
     for index, result in enumerate(search_results):
         print(f"{index+1}. {hybrid_search.idx.docmap[result['id']].title}")
         print(f"\tRRF score: {result['data']['rrf_score']}")
