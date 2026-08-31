@@ -63,7 +63,7 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--rerank-method",
         type=str,
-        choices=["individual","batch"],
+        choices=["individual","batch","cross_encoder"],
         help="Query enhancement method"
     )
 

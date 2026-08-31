@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import TypedDict, TYPE_CHECKING
+import numpy as np
+from sentence_transformers import CrossEncoder
 
 from movies import load_movies
 from inverted_index import InvertedIndex, DocID
@@ -272,6 +274,40 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
                 print(f"\tRe-rank rank: {index+1}")
                 print(f"RRF Score: {movie_rff_score}")
                 print(f"\tBM25 rank: {movie_bm25_rank}, Semantic rank: {movie_sem_rank}")
+                print(f"\t{movie_descr:.80}")
+        case "cross_encoder":
+            search_results = hybrid_search.rrf_search(query_used, k, limit * 5)
+            pairs: list[list[str]] = []
+            for result in search_results:
+                doc = hybrid_search.idx.docmap[result["id"]]
+                pairs.append([query, f"{doc.title} - {doc.description}"])
+            print(f"Re-ranking top {limit} results using {rerank_method} method...")
+            print(f"Reciprocal Rank Fusion results for '{query_used}' (k={k})")
+            cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+            scores = cross_encoder.predict(pairs)
+            results_with_scores: list[tuple[RRFScoreRecord, float]] = \
+            list(
+                sorted(
+                    [
+                        (result, scores[index])
+                        for index, result in enumerate(search_results)
+                    ], 
+                    key=lambda tuple: tuple[1], 
+                    reverse=True
+                )
+            )
+            for i in range(min(limit, len(results_with_scores))):
+                movie_id = results_with_scores[i][0]["id"]
+                movie_title = hybrid_search.idx.docmap[movie_id].title
+                movie_descr = hybrid_search.idx.docmap[movie_id].description
+                ce_score = results_with_scores[i][1]
+                rrf_score = results_with_scores[i][0]["data"]["rrf_score"]
+                bm25_rank = results_with_scores[i][0]["data"]["bm25_rank"]
+                sem_rank = results_with_scores[i][0]["data"]["sem_rank"]
+                print(f"{i+1}. {movie_title} ({movie_id})")
+                print(f"\tCross Encoder Score: {ce_score:.3f}")
+                print(f"\tRRF score: {rrf_score:.3f}")
+                print(f"\tBM25 rank: {bm25_rank}, Semantic rank: {sem_rank}")
                 print(f"\t{movie_descr:.80}")
         case _:
             search_results = hybrid_search.rrf_search(query_used, k, limit)
