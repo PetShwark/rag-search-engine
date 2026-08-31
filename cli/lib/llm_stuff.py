@@ -72,3 +72,38 @@ User-provided movie search query: "{query}"
     if isinstance(completions, ChatCompletion):
         result = completions.choices[0].message.content 
     return result
+
+
+def llm_expand_query(query: str) -> str | None:
+    result = None
+    load_dotenv()
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""Expand the user-provided movie search query below with related terms.
+
+Add synonyms and related concepts that might appear in movie descriptions.
+Keep expansions relevant and focused.
+Output only the additional terms; they will be appended to the original query.
+
+Examples:
+- "scary bear movie" -> "scary horror grizzly bear movie terrifying film"
+- "action movie with bear" -> "action thriller bear chase fight adventure"
+- "comedy with bear" -> "comedy funny bear humor lighthearted"
+
+User-provided movie query: "{query}"
+"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    if isinstance(completions, ChatCompletion):
+        result = completions.choices[0].message.content 
+    return result

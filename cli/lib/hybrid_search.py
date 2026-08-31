@@ -5,7 +5,7 @@ from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
 from movies import Movie
-from .llm_stuff import llm_spell_check, llm_rewrite_query
+from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query
 
 
 class HybridScoreData(TypedDict):
@@ -213,12 +213,14 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str) -> None:
     match enhance:
         case "spell":
             new_query = llm_spell_check(query)
-            print(f"Enhanced qxuery ({enhance}): '{old_query}' -> '{new_query}'\n")
         case "rewrite":
             new_query = llm_rewrite_query(query)
-            print(f"Enhanced query ({enhance}): '{old_query}' -> '{new_query}'\n")
+        case "expand":
+            new_query = llm_expand_query(query)
         case _:
             new_query = None
+    if enhance:
+        print(f"Enhanced query ({enhance}): '{old_query}' -> '{new_query}'\n")
     documents = load_movies(HybridSearch.MOVIES_JSON_FILE.__str__())
     hybrid_search = HybridSearch(documents.movies)
     search_results = hybrid_search.rrf_search(new_query if new_query else old_query, k, limit)
