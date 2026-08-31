@@ -5,7 +5,7 @@ from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
 from movies import Movie
-from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query, llm_rerank_rrf_search_results
+from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query, llm_rerank_rrf_search_results, llm_batch_rerank_rrf_search_results
 if TYPE_CHECKING:
     from inverted_index import DocID
 
@@ -208,6 +208,21 @@ def weighted_search_command(query: str, alpha: float, limit: int) -> None:
         print(f"\t{result['data']['document']:.80}")
 
 
+def get_rff_score_for_movie_id(movid_id: DocID, rff_search_results: list[RRFScoreRecord]) -> float:
+    result = next((result["data"]["rrf_score"] for result in rff_search_results if result.get("id") == movid_id), 0.0)
+    return result
+
+
+def get_bm25_rank_for_movie_id(movid_id: DocID, rff_search_results: list[RRFScoreRecord]) -> int:
+    result = next((result["data"]["bm25_rank"] for result in rff_search_results if result.get("id") == movid_id), 0)
+    return result
+
+
+def get_sem_rank_for_movie_id(movid_id: DocID, rff_search_results: list[RRFScoreRecord]) -> int:
+    result = next((result["data"]["sem_rank"] for result in rff_search_results if result.get("id") == movid_id), 0)
+    return result
+
+
 def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_method: str) -> None:
     old_query = query
     new_query: str | None = None
@@ -225,12 +240,12 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
         print(f"Enhanced query ({enhance}): '{old_query}' -> '{new_query}'\n")
     documents = load_movies(HybridSearch.MOVIES_JSON_FILE.__str__())
     hybrid_search = HybridSearch(documents.movies)
+    query_used = new_query if new_query else old_query
     match rerank_method:
         case "individual":
-            query_used = new_query if new_query else old_query
             # Jack up the number of results by five times
             search_results = hybrid_search.rrf_search(query_used, k, limit * 5)
-            print(f"Reranking top {limit} results using individual method...")
+            print(f"Reranking top {limit} results using {rerank_method} method...")
             sorted_scored_search_results = llm_rerank_rrf_search_results(query_used, search_results, hybrid_search.idx.docmap)
             print(f"Reciprocal Rank Fusion results for '{query_used}' (k={k})")
             for index, (llm_rating, result) in enumerate(sorted_scored_search_results):
@@ -241,8 +256,25 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
                 print(f"RRF Score: {result['data']['rrf_score']}")
                 print(f"\tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}")
                 print(f"\t{result['data']['document']:.80}")
+        case "batch":
+            search_results = hybrid_search.rrf_search(query_used, k, limit * 5)
+            print(f"Reranking top {limit} results using {rerank_method} method...")
+            ranked_movie_ids = llm_batch_rerank_rrf_search_results(query_used, search_results, hybrid_search.idx.docmap)
+            for index, movie_id in enumerate(ranked_movie_ids):
+                if index >= limit:
+                    break
+                movie_title = hybrid_search.idx.docmap[movie_id].title if hybrid_search.idx.docmap.get(movie_id) else "Movie ID lookup error"
+                movie_descr = hybrid_search.idx.docmap[movie_id].description if hybrid_search.idx.docmap.get(movie_id) else "Movie ID lookup error"
+                movie_rff_score = get_rff_score_for_movie_id(movie_id, search_results)
+                movie_bm25_rank = get_bm25_rank_for_movie_id(movie_id, search_results)
+                movie_sem_rank = get_sem_rank_for_movie_id(movie_id, search_results)
+                print(f"{index+1}. {movie_title} ({movie_id})")
+                print(f"\tRe-rank rank: {index+1}")
+                print(f"RRF Score: {movie_rff_score}")
+                print(f"\tBM25 rank: {movie_bm25_rank}, Semantic rank: {movie_sem_rank}")
+                print(f"\t{movie_descr:.80}")
         case _:
-            search_results = hybrid_search.rrf_search(new_query if new_query else old_query, k, limit)
+            search_results = hybrid_search.rrf_search(query_used, k, limit)
             for index, result in enumerate(search_results):
                 print(f"{index+1}. {hybrid_search.idx.docmap[result['id']].title}")
                 print(f"\tRRF score: {result['data']['rrf_score']}")
