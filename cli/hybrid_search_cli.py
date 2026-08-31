@@ -54,6 +54,13 @@ def main() -> None:
         default=5,
         help="The maximum number of results to display"
     )
+    rrf_search_parser.add_argument(
+        "--enhance",
+        type=str,
+        nargs="?",
+        choices=["spell"],
+        help="Query enhancement method"
+    )
 
     args = parser.parse_args()
 
@@ -66,7 +73,7 @@ def main() -> None:
             print(f"Query: {args.query}")
             print(f"k is {args.k}")
             print(f"limit is {args.limit}")
-            rrf_search_command(args.query, args.k, args.limit)
+            rrf_search_command(args.query, args.k, args.limit, args.enhance)
         case _:
             parser.print_help()
 

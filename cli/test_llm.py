@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletion
 
 load_dotenv()
 api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -12,7 +13,7 @@ client = OpenAI(
     api_key=api_key,
 )
 
-messages = [
+messages: list[ChatCompletionMessageParam] = [
     {
         "role": "user",
         "content": "Why is Boot.dev such a great place to learn about RAG? Use one paragraph maximum.",
@@ -20,6 +21,10 @@ messages = [
 ]
 completion = client.chat.completions.create(messages=messages, model="openrouter/free")
 
-print(f"Response: {completion.choices[0].message.content}")
-print(f"Prompt tokens: {completion.usage.prompt_tokens}")
-print(f"Response tokens: {completion.usage.completion_tokens}")
+if isinstance(completion, ChatCompletion):
+    print(f"Response: {completion.choices[0].message.content}")
+    if completion.usage:
+        print(f"Prompt tokens: {completion.usage.prompt_tokens}")
+        print(f"Response tokens: {completion.usage.completion_tokens}")
+else:
+    print(f"Chat completion did not return correctly.")
