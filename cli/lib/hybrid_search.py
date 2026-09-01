@@ -8,7 +8,13 @@ from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
 from movies import Movie
-from .llm_stuff import llm_spell_check, llm_rewrite_query, llm_expand_query, llm_rerank_rrf_search_results, llm_batch_rerank_rrf_search_results
+from .llm_stuff \
+    import llm_spell_check, \
+        llm_rewrite_query, \
+        llm_expand_query, \
+        llm_rerank_rrf_search_results, \
+        llm_batch_rerank_rrf_search_results, \
+        llm_evaluate_search_results
 if TYPE_CHECKING:
     from inverted_index import DocID
 
@@ -226,7 +232,7 @@ def get_sem_rank_for_movie_id(movid_id: DocID, rff_search_results: list[RRFScore
     return result
 
 
-def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_method: str) -> None:
+def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_method: str, evaluate: bool) -> None:
     old_query = query
     new_query: str | None = None
     # If the enhance string exists, do some enhancing of the query
@@ -244,6 +250,16 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
     documents = load_movies(HybridSearch.MOVIES_JSON_FILE.__str__())
     hybrid_search = HybridSearch(documents.movies)
     query_used = new_query if new_query else old_query
+    # If evaluate, ignore rerank if supplied
+    if evaluate:
+        search_results = hybrid_search.rrf_search(query_used, k, limit)
+        eval_scores = llm_evaluate_search_results(query_used, search_results, hybrid_search.idx.docmap) # list of ints 0-3 as ratings, 3 is best 
+        if len(search_results) != len(eval_scores):
+            print(f"Evaluation failure.  Different number of ratings returned.")
+            return
+        for i, rating in enumerate(eval_scores):
+            print(f"{i+1}. {hybrid_search.idx.docmap[search_results[i]['id']].title} {rating}/3")
+        return
     match rerank_method:
         case "individual":
             # Jack up the number of results by five times

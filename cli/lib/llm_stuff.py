@@ -12,9 +12,7 @@ if TYPE_CHECKING:
 from .helper_funcs import rating_text_to_float
 
 
-
-def llm_spell_check(query: str) -> str | None:
-    result = None
+def get_llm_client() -> OpenAI:
     load_dotenv()
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
@@ -23,6 +21,12 @@ def llm_spell_check(query: str) -> str | None:
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
     )
+    return client
+
+
+def llm_spell_check(query: str) -> str | None:
+    result = None
+    client = get_llm_client()
     messages: list[ChatCompletionMessageParam] = \
         [
             {
@@ -44,14 +48,7 @@ def llm_spell_check(query: str) -> str | None:
 
 def llm_rewrite_query(query: str) -> str | None:
     result = None
-    load_dotenv()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-    )
+    client = get_llm_client()
     messages: list[ChatCompletionMessageParam] = \
         [
             {
@@ -85,14 +82,7 @@ def llm_rewrite_query(query: str) -> str | None:
 
 def llm_expand_query(query: str) -> str | None:
     result = None
-    load_dotenv()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-    )
+    client = get_llm_client()
     messages: list[ChatCompletionMessageParam] = \
         [
             {
@@ -118,68 +108,14 @@ def llm_expand_query(query: str) -> str | None:
     return result
 
 
-# def llm_rerank_query(query: str, movies: list[Movie]) -> list[tuple[Movie, float]]:
-#     """
-#     Take a user-supplied movie search query string and a list of Movie objects and use the
-#     OpenRouter/free model to see how well each movie matches the supplied query.  Return a
-#     list of the given movies each with a 0-10 match score supplied by the model.
-#     """
-#     result: list[tuple[Movie, float]] = []
-#     load_dotenv()
-#     api_key = os.environ.get("OPENROUTER_API_KEY")
-#     if not api_key:
-#         raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-#     client = OpenAI(
-#         base_url="https://openrouter.ai/api/v1",
-#         api_key=api_key,
-#     )
-#     for movie in movies:
-#         messages: list[ChatCompletionMessageParam] = \
-#             [
-#                 {
-#                     "role":"user",
-#                     "content":f"""Rate how well this movie matches the search query.
-
-#                     Query: "{query}"
-#                     Movie: {movie.title} - {movie.description}
-
-#                     Consider:
-#                     - Direct relevance to query
-#                     - User intent (what they're looking for)
-#                     - Content appropriateness
-
-#                     Rate 0-10 (10 = perfect match).
-#                     Output ONLY the number in your response, no other text or explanation.
-
-#                     Score:"""
-#                 }
-#             ]
-#         completions = client.chat.completions.create(messages=messages, model="openrouter/free")
-#         movie_score = 0.0
-#         if isinstance(completions, ChatCompletion):
-#             returned_content = completions.choices[0].message.content
-#             movie_score = float(returned_content) if isinstance(returned_content,str) else 0.0
-#         result.append((movie, movie_score))
-#         # Give the LLM a rest so we don't get throttled
-#         sleep(5) # seconds
-#     return result
-
-
 def llm_rerank_rrf_search_results(query: str, search_results: list[RRFScoreRecord], docmap: dict[int, Movie]) -> list[tuple[float, RRFScoreRecord]]:
     """
     Use an LLM to give ratings on how well a given movie in the search results matches the given query.  The docmap is needed
     to lookup the title and description info for the llm to do the rating.  The serch results only has the movie's id.
     """
+    client = get_llm_client()
     accumulator: list[tuple[float, RRFScoreRecord]] = []
     # Accumulate llm ratings
-    load_dotenv()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-    )
     for search_result in search_results:
         messages: list[ChatCompletionMessageParam] = \
             [
@@ -219,14 +155,7 @@ def llm_rerank_rrf_search_results(query: str, search_results: list[RRFScoreRecor
 
 
 def llm_batch_rerank_rrf_search_results(query: str, search_results: list[RRFScoreRecord], docmap: dict[int, Movie]) -> list[DocID]:
-    load_dotenv()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-    )
+    client = get_llm_client()
     # Build the list of movies for the prompt
     movie_list_text = ""
     for search_result in search_results:
@@ -263,3 +192,51 @@ def llm_batch_rerank_rrf_search_results(query: str, search_results: list[RRFScor
     if movie_id_json := completions.choices[0].message.content:
         ranked_movie_ids: list[int] = loads(movie_id_json)
     return ranked_movie_ids
+
+
+def llm_evaluate_search_results(query: str, search_results: list[RRFScoreRecord], docmap: dict[int, Movie]) -> list[int]:
+    """
+    Use an LLM prompt to evaluate the RRF movie search results given.  The docmap is provided in order to 
+    get movie title and description information for the prompt.  The prompt specifically requests that 
+    the LLM return a JSON list of integers [0,3] as the ratings of the movies in the order of the search 
+    results.
+    """
+    client = get_llm_client()
+    formatted_results: list[str] = []
+    for index, result in enumerate(search_results):
+        result_str = f"""{index+1}. {docmap[result['id']].title}
+        \tRRF score: {result['data']['rrf_score']}
+        \tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}
+        \t{docmap[result['id']].description}
+        """
+        formatted_results.append(result_str)
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+                Query: "{query}"
+
+                Results:
+                {chr(10).join(formatted_results)}
+
+                Scale:
+                - 3: Highly relevant
+                - 2: Relevant
+                - 1: Marginally relevant
+                - 0: Not relevant
+
+                Do NOT give any numbers other than 0, 1, 2, or 3.
+
+                Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+                [2, 0, 3, 2, 0, 1]"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    json_list_str = completions.choices[0].message.content
+    json_list = []
+    if json_list_str:
+        json_list = loads(json_list_str)
+    return json_list

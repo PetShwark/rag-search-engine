@@ -1,4 +1,5 @@
 import argparse
+from constants import DEBUG
 from lib.hybrid_search import normalize_command, weighted_search_command, rrf_search_command
 
 
@@ -66,6 +67,11 @@ def main() -> None:
         choices=["individual","batch","cross_encoder"],
         help="Query enhancement method"
     )
+    rrf_search_parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Use an LLM to rate the RRF search results."
+    )
 
     args = parser.parse_args()
 
@@ -75,10 +81,10 @@ def main() -> None:
         case "weighted-search":
             weighted_search_command(args.query, args.alpha, args.limit)
         case "rrf-search":
-            print(f"Query: {args.query}")
-            print(f"k is {args.k}")
-            print(f"limit is {args.limit}")
-            rrf_search_command(args.query, args.k, args.limit, args.enhance, args.rerank_method)
+            if DEBUG: print(f"Query: {args.query}")
+            if DEBUG: print(f"k is {args.k}")
+            if DEBUG: print(f"limit is {args.limit}")
+            rrf_search_command(args.query, args.k, args.limit, args.enhance, args.rerank_method, args.evaluate)
         case _:
             parser.print_help()
 
