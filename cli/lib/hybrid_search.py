@@ -272,7 +272,7 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
                 movie_sem_rank = get_sem_rank_for_movie_id(movie_id, search_results)
                 print(f"{index+1}. {movie_title} ({movie_id})")
                 print(f"\tRe-rank rank: {index+1}")
-                print(f"RRF Score: {movie_rff_score}")
+                print(f"\tRRF Score: {movie_rff_score}")
                 print(f"\tBM25 rank: {movie_bm25_rank}, Semantic rank: {movie_sem_rank}")
                 print(f"\t{movie_descr:.80}")
         case "cross_encoder":
