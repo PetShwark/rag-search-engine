@@ -3,6 +3,7 @@ from typing import TypedDict, TYPE_CHECKING
 import numpy as np
 from sentence_transformers import CrossEncoder
 
+from constants import DEBUG
 from movies import load_movies
 from inverted_index import InvertedIndex, DocID
 from .semantic_search import ChunkedSemanticSearch, ChunkedSearchResult
@@ -277,6 +278,11 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
                 print(f"\t{movie_descr:.80}")
         case "cross_encoder":
             search_results = hybrid_search.rrf_search(query_used, k, limit * 5)
+            if DEBUG:
+                print(f"RFF Search Results")
+                for result in search_results:
+                    print(f"({result['id']}) {hybrid_search.idx.docmap[result['id']].title}")
+                    print(f"\tRFF: {result['data']['rrf_score']:.3f} BM25: {result['data']['bm25_rank']} SEM: {result['data']['sem_rank']}")
             pairs: list[list[str]] = []
             for result in search_results:
                 doc = hybrid_search.idx.docmap[result["id"]]
@@ -296,7 +302,7 @@ def rrf_search_command(query: str, k: float, limit: int, enhance: str, rerank_me
                     reverse=True
                 )
             )
-            for i in range(min(limit, len(results_with_scores))):
+            for i in range(min(limit, len(results_with_scores)) if not DEBUG else len(results_with_scores)):
                 movie_id = results_with_scores[i][0]["id"]
                 movie_title = hybrid_search.idx.docmap[movie_id].title
                 movie_descr = hybrid_search.idx.docmap[movie_id].description
