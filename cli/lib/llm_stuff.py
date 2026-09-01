@@ -240,3 +240,32 @@ def llm_evaluate_search_results(query: str, search_results: list[RRFScoreRecord]
     if json_list_str:
         json_list = loads(json_list_str)
     return json_list
+
+
+
+def rag_search_command(query: str, search_results: list[RRFScoreRecord], docmap: dict[DocID, Movie]) -> str:
+    client = get_llm_client()
+    # Assemble docs list for prompt
+    docs = ""
+    for search_result in search_results:
+        docs += f"- {docmap[search_result['id']].title}\n"
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""You are a RAG agent for Webflyx, a movie streaming service.
+                Your task is to provide a natural-language answer to the user's query based on documents retrieved during search.
+                Provide a comprehensive answer that addresses the user's query.
+                You may make suggestions for documents that are not listed in the provided list of documents.
+
+                Query: {query}
+
+                Documents:
+                {docs}
+
+                Answer:"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    result = completions.choices[0].message.content
+    return result if result else ""
