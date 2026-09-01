@@ -45,21 +45,21 @@ def main() -> None:
         print(f"k = {args.limit}\n\n")
         for test_item in golden_dataset.test_cases:
             search_results = hybrid_search.rrf_search(test_item.query, test_k, args.limit)
-            # Trim relevant list down to args.limit length - into a set
-            golden_test_titles = {
-                title
-                for i, title in enumerate(test_item.relevant_docs)
-                if i < args.limit
-            }
             retrieved_titles = {
                 hybrid_search.idx.docmap[search_result["id"]].title
                 for search_result in search_results
             }
-            relevant_titles = golden_test_titles & retrieved_titles
+            relevant_titles = set(test_item.relevant_docs) & retrieved_titles
+            precision_score = len(relevant_titles) / len(retrieved_titles)
+            recall_score = len(relevant_titles) / len(test_item.relevant_docs)
+            f1_score = 2 * (precision_score * recall_score) / (precision_score + recall_score) if (precision_score + recall_score) != 0.0 else 0.0
             print(f"- Query: {test_item.query}")
-            print(f"\t- Precision@{args.limit}: {(len(relevant_titles)/len(retrieved_titles)):.4f}")
-            print(f"\tRetrieved: {', '.join(retrieved_titles)}")
-            print(f"\tRelevant: {', '.join(relevant_titles)}")
+            print(f"\t- Precision@{args.limit}: {precision_score:.4f}")
+            print(f"\t- Recall@{args.limit}: {recall_score:.4f}")
+            print(f"\t- F1 Score: {f1_score:.4f}")
+            print(f"\tRetrieved: {'; '.join(retrieved_titles)}")
+            print(f"\tRelevant: {'; '.join(relevant_titles)}")
+            print(f"\tGolden: {'; '.join(test_item.relevant_docs)}\n")
 
 
 

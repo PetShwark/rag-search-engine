@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from typing import TypedDict
 from movies import Movie, load_movies
-from constants import SEMANTIC_SCORE_PRECISION, SEMANTIC_SEARCH_DESCR_MAX_LEN
+from constants import DEBUG, SEMANTIC_SCORE_PRECISION, SEMANTIC_SEARCH_DESCR_MAX_LEN
 from pathlib import Path
 from tqdm import tqdm
 import json
@@ -14,9 +14,9 @@ class SemanticSearch:
     MOVIES_JSON_FILE = Path("./data") / "movies.json"
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        print(f"Loading sentence transformer '{model_name}', please wait.")
+        if DEBUG: print(f"Loading sentence transformer '{model_name}', please wait.")
         self.model = SentenceTransformer(model_name)
-        print("Done.")
+        if DEBUG: print("Done.")
         self.embeddings: np.ndarray | None = None
         self.documents: list[Movie] = []
         self.document_map: dict[int, Movie] = {}
@@ -66,7 +66,7 @@ class SemanticSearch:
         query_embedding = self.generate_embedding(query)
         similarity_scores: list[tuple[float, Movie]] = []
         # Keys should be in same order as added to dictionary
-        for index, (_, doc) in tqdm(enumerate(self.document_map.items()), desc="Scoring movies"):
+        for index, (_, doc) in tqdm(enumerate(self.document_map.items()), desc="Scoring movies") if DEBUG else enumerate(self.document_map.items()):
             similarity_scores.append(
                 (cosine_similarity(query_embedding, self.embeddings[index]), doc))
         sorted_scores = sorted(
@@ -139,7 +139,7 @@ class ChunkedSemanticSearch(SemanticSearch):
                     "total_chunks": num_chunks
                 })
         print(f"All chunks list size: {len(all_chunks)}")
-        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
+        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=DEBUG)
         self.chunk_metadata = all_metadata
         with open(ChunkedSemanticSearch.EMBEDDINGS_SAVE_FILE, "wb") as embeddings_file, \
             open(ChunkedSemanticSearch.CHUNK_METADATA_JSON_FILE, "w") as metadata_file:

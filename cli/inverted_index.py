@@ -5,7 +5,7 @@ from pathlib import Path
 from tqdm import tqdm
 from tokenizer import get_tokens_from_string, depunctuate
 from movies import load_movies, Movie
-from constants import BM25_K1, BM25_B
+from constants import DEBUG, BM25_K1, BM25_B
 
 type Token = str
 type DocID = int
@@ -90,7 +90,7 @@ class InvertedIndex(BaseModel):
         return result
 
     def build(self, json_file_name: str) -> None:
-        print(f"Reading {json_file_name}...")
+        if DEBUG: print(f"Reading {json_file_name}...")
         movies_list = load_movies(json_file_name)
         for movie in tqdm(movies_list.movies):
             doc_id = movie.id
@@ -103,37 +103,37 @@ class InvertedIndex(BaseModel):
             open(InvertedIndex.DOCMAP_PICKLE_PATH, "wb") as docmap_file, \
             open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "wb") as term_frequencies_file, \
             open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "wb") as doc_lengths_file:
-            print("Saving index...")
+            if DEBUG: print("Saving index...")
             dump(self.index, index_file)
-            print("Saving docmap...")
+            if DEBUG: print("Saving docmap...")
             dump(self.docmap, docmap_file)
-            print("Saving term frequencies...")
+            if DEBUG: print("Saving term frequencies...")
             dump(self.term_frequencies, term_frequencies_file)
-            print("Saving document lengths...")
+            if DEBUG: print("Saving document lengths...")
             dump(self.doc_lengths, doc_lengths_file)
-            print("Done.")
+            if DEBUG: print("Done.")
 
     def load(self) -> None:
         with open(InvertedIndex.INDEX_PICKLE_PATH, "rb") as index_file, \
             open(InvertedIndex.DOCMAP_PICKLE_PATH, "rb") as docmap_file, \
             open(InvertedIndex.TERM_FREQ_PICKLE_PATH, "rb") as term_frequencies_file, \
             open(InvertedIndex.DOC_LENGTHS_PICKLE_PATH, "rb") as doc_lengths_file:
-            print("Loading index...")
+            if DEBUG: print("Loading index...")
             self.index = load(index_file)
-            print("Loading docmap...")
+            if DEBUG: print("Loading docmap...")
             self.docmap = load(docmap_file)
-            print("Loading term frequencies...")
+            if DEBUG: print("Loading term frequencies...")
             self.term_frequencies = load(term_frequencies_file)
-            print("Loading document lengths...")
+            if DEBUG: print("Loading document lengths...")
             self.doc_lengths = load(doc_lengths_file)
-            print("Done.\n")
+            if DEBUG: print("Done.\n")
 
     def bm25(self, doc_id: DocID, term: str) -> float:
         return self.get_bm25_tf(doc_id, term, BM25_K1, BM25_B) * self.get_bm25_idf(term)
 
     def bm25search(self, query: str, limit: int) -> dict[DocID, float]:
         query_tokens = get_tokens_from_string(query, InvertedIndex.STOP_WORDS_LIST)
-        print(f"Tokens from processed query string: {" ".join(query_tokens)}")
+        if DEBUG: print(f"Tokens from processed query string: {" ".join(query_tokens)}")
         accumulator: dict[DocID, float] = {}
         for query_token in query_tokens:
             movies_for_token = self.index.get(query_token, set())
