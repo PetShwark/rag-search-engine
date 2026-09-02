@@ -269,3 +269,75 @@ def rag_search_command(query: str, search_results: list[RRFScoreRecord], docmap:
     completions = client.chat.completions.create(messages=messages, model="openrouter/free")
     result = completions.choices[0].message.content
     return result if result else ""
+
+
+
+def rag_summarize_command(query: str, search_results: list[RRFScoreRecord], docmap: dict[DocID, Movie]) -> str:
+    client = get_llm_client()
+    # Assemble docs list for prompt
+    results: list[str] = []
+    for index, result in enumerate(search_results):
+        result_str = f"""{index+1}. {docmap[result['id']].title}
+        \tReciprocal Rank Fusion score: {result['data']['rrf_score']}
+        \tBM25 rank: {result['data']['bm25_rank']}, Semantic rank: {result['data']['sem_rank']}
+        \t{docmap[result['id']].description}
+        """
+        results.append(result_str)
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""Provide information useful to the query below by synthesizing data from multiple search results in detail.
+
+                The goal is to provide comprehensive information so that users know what their options are.
+                Your response should be information-dense and concise, with several key pieces of information about the genre, plot, etc. of each movie.
+
+                This should be tailored to Webflyx users. Webflyx is a movie streaming service.
+
+                Query: {query}
+
+                Search results:
+                {results}
+
+                Provide a comprehensive 3–4 sentence answer that combines information from multiple sources:"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    result = completions.choices[0].message.content
+    return result if result else ""
+
+
+
+def rag_citations_command(query: str, search_results: list[RRFScoreRecord], docmap: dict[DocID, Movie]) -> str:
+    client = get_llm_client()
+    # Assemble docs list for prompt
+    docs = ""
+    for search_result in search_results:
+        docs += f"- {docmap[search_result['id']].title}\n"
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""Answer the query below and give information based on the provided documents.
+
+                The answer should be tailored to users of Webflyx, a movie streaming service.
+                If not enough information is available to provide a good answer, say so, but give the best answer possible while citing the sources available.
+
+                Query: {query}
+
+                Documents:
+                {docs}
+
+                Instructions:
+                - Provide a comprehensive answer that addresses the query
+                - Cite sources in the format [1], [2], etc. when referencing information
+                - If sources disagree, mention the different viewpoints
+                - If the answer isn't in the provided documents, say "I don't have enough information"
+                - Be direct and informative
+
+                Answer:"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    result = completions.choices[0].message.content
+    return result if result else ""
