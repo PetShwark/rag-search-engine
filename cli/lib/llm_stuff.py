@@ -341,3 +341,36 @@ def rag_citations_command(query: str, search_results: list[RRFScoreRecord], docm
     completions = client.chat.completions.create(messages=messages, model="openrouter/free")
     result = completions.choices[0].message.content
     return result if result else ""
+
+
+
+def rag_question_command(query: str, search_results: list[RRFScoreRecord], docmap: dict[DocID, Movie]) -> str:
+    client = get_llm_client()
+    # Assemble docs list for prompt
+    context = ""
+    for index, search_result in enumerate(search_results):
+        context += f"Movie {index+1} Title: {docmap[search_result['id']].title}\n"
+        context += f"Movie {index+1} Description: {docmap[search_result['id']].description}\n\n\n"
+    messages: list[ChatCompletionMessageParam] = \
+        [
+            {
+                "role":"user",
+                "content":f"""Answer the user's question based on the provided movies that are available on Webflyx, a streaming service.
+
+                Question: {query}
+
+                Documents:
+                {context}
+
+                Instructions:
+                - Answer questions directly and concisely
+                - Be casual and conversational
+                - Don't be cringe or hype-y
+                - Talk like a normal person would in a chat conversation
+
+                Answer:"""
+            }
+        ]
+    completions = client.chat.completions.create(messages=messages, model="openrouter/free")
+    result = completions.choices[0].message.content
+    return result if result else ""
