@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from inverted_index import DocID
     from movies import Movie
     from .hybrid_search import RRFScoreRecord
+from constants import DEBUG
 from .helper_funcs import rating_text_to_float
 
 
@@ -374,3 +375,40 @@ def rag_question_command(query: str, search_results: list[RRFScoreRecord], docma
     completions = client.chat.completions.create(messages=messages, model="openrouter/free")
     result = completions.choices[0].message.content
     return result if result else ""
+
+
+def describe_image_command(query: str, image_path_str: str) -> None:
+    from pathlib import Path
+    from mimetypes import guess_type
+    import base64
+    image_path = Path(image_path_str)
+    if DEBUG: print(f"Query: {query}")
+    if DEBUG: print(f"Image: {image_path}")
+    llm_client = get_llm_client()
+    if not image_path.exists():
+        raise FileNotFoundError(f"{image_path_str} does not exist")
+    mime, _ = guess_type(image_path_str)
+    mime = mime or "image/jpeg"
+    with open(image_path, "rb") as image_file:
+        image_data = image_file.read()
+    system_prompt = f"""Given the included image and text query, rewrite the text query to improve search results from a movie database. Make sure to:
+        - Synthesize visual and textual information
+        - Focus on movie-specific details (actors, scenes, style, etc.)
+        - Return only the rewritten query, without any additional commentary
+    """
+    data_url = f"data:{mime};base64,{base64.b64encode(image_data).decode()}"
+    messages: list[ChatCompletionMessageParam] = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": system_prompt.strip()},
+                {"type": "image_url", "image_url": {"url": data_url}},
+                {"type": "text", "text": query.strip()},
+            ],
+        }
+    ]
+    llm_response = llm_client.chat.completions.create(messages=messages, model="openrouter/free")
+    content = llm_response.choices[0].message.content
+    print(f"Rewritten query: {content.strip() if content else ''}")
+    if llm_response.usage is not None:
+        print(f"Total tokens:    {llm_response.usage.total_tokens}")
